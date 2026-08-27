@@ -61,6 +61,9 @@ class ImagePickerViewModel(
     private val _workingColumnState = MutableStateFlow<WorkingColumnState>(WorkingColumnState.Idle)
     val workingColumnState: StateFlow<WorkingColumnState> = _workingColumnState
 
+    private val _isChangingWorkingColumn = MutableStateFlow(false)
+    val isChangingWorkingColumn: StateFlow<Boolean> = _isChangingWorkingColumn
+
     private val _savedImageIds = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val savedImageIds: SharedFlow<String> = _savedImageIds
 
@@ -222,6 +225,38 @@ class ImagePickerViewModel(
                         error.message ?: "Could not calculate bead colors"
                     )
                 }
+        }
+    }
+
+    fun changeWorkingColumn(imageId: String, targetColumn: Int) {
+        if (_isChangingWorkingColumn.value) return
+        val content = _workingColumnState.value as? WorkingColumnState.Content ?: return
+        if (targetColumn !in 0 until content.beadColumn.totalColumns) return
+        if (targetColumn == content.beadColumn.column) return
+
+        workingColumnJob?.cancel()
+        _isChangingWorkingColumn.value = true
+        workingColumnJob = viewModelScope.launch {
+            try {
+                repository.setCurrentColumn(imageId, targetColumn)
+                    .onFailure { error ->
+                        _workingColumnState.value = WorkingColumnState.Error(
+                            error.message ?: "Could not change the current column"
+                        )
+                        return@launch
+                    }
+                repository.loadCurrentColumnColors(imageId)
+                    .onSuccess { column ->
+                        _workingColumnState.value = WorkingColumnState.Content(column)
+                    }
+                    .onFailure { error ->
+                        _workingColumnState.value = WorkingColumnState.Error(
+                            error.message ?: "Could not calculate bead colors"
+                        )
+                    }
+            } finally {
+                _isChangingWorkingColumn.value = false
+            }
         }
     }
 
