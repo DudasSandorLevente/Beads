@@ -58,4 +58,24 @@ class WorkingViewLayoutTest {
         assertEquals(1, displayedColumnNumber(0))
         assertEquals(10, displayedColumnNumber(9))
     }
+
+    @Test
+    fun visibleColumnCapacity_fitsCompleteColumnsAndCapsAtTotal() {
+        assertEquals(
+            5,
+            calculateVisibleColumnCapacity(availableWidth = 208.dp, squareSize = 40.dp, gap = 2.dp, totalColumns = 10)
+        )
+        assertEquals(
+            3,
+            calculateVisibleColumnCapacity(availableWidth = 500.dp, squareSize = 40.dp, gap = 2.dp, totalColumns = 3)
+        )
+    }
+
+    @Test
+    fun visibleColumnCapacity_alwaysReturnsAtLeastOne() {
+        assertEquals(
+            1,
+            calculateVisibleColumnCapacity(availableWidth = 1.dp, squareSize = 40.dp, gap = 2.dp, totalColumns = 10)
+        )
+    }
 }

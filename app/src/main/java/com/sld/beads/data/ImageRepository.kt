@@ -168,7 +168,10 @@ class ImageRepository(
         }
     }
 
-    suspend fun loadCurrentColumnColors(imageId: String): Result<BeadColumn> =
+    suspend fun loadWorkingColumnColors(
+        imageId: String,
+        visibleColumnCapacity: Int
+    ): Result<BeadColumnWindow> =
         withContext(Dispatchers.IO) {
             var bitmap: android.graphics.Bitmap? = null
             try {
@@ -200,10 +203,11 @@ class ImageRepository(
                 }
 
                 Result.success(
-                    sampleBeadColumn(
+                    sampleBeadColumnWindow(
                         workingArea = workingArea,
                         beadGridSize = beadGridSize,
                         currentColumn = record.currentColumn,
+                        capacity = visibleColumnCapacity,
                         pixelAt = bitmap::getPixel
                     )
                 )

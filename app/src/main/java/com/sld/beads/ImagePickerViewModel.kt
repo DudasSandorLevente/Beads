@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.sld.beads.data.BeadGridSize
-import com.sld.beads.data.BeadColumn
+import com.sld.beads.data.BeadColumnWindow
 import com.sld.beads.data.ConfigurationField
 import com.sld.beads.data.ConfigurationValidationException
 import com.sld.beads.data.ImageDao
@@ -32,7 +32,7 @@ data class ConfigurationFormState(
 sealed interface WorkingColumnState {
     data object Idle : WorkingColumnState
     data object Loading : WorkingColumnState
-    data class Content(val beadColumn: BeadColumn) : WorkingColumnState
+    data class Content(val window: BeadColumnWindow) : WorkingColumnState
     data class Error(val message: String) : WorkingColumnState
 }
 
@@ -79,6 +79,8 @@ class ImagePickerViewModel(
     private var loadedImageId: String? = null
     private var isCreateActive = false
     private var workingColumnJob: Job? = null
+    private var workingColumnCapacity = 1
+    private var workingColumnRequestId = 0
 
     init {
         viewModelScope.launch {
@@ -214,11 +216,14 @@ class ImagePickerViewModel(
 
     fun loadWorkingColumn(imageId: String) {
         workingColumnJob?.cancel()
+        workingColumnRequestId++
+        _isChangingWorkingColumn.value = false
+        workingColumnCapacity = 1
         _workingColumnState.value = WorkingColumnState.Loading
         workingColumnJob = viewModelScope.launch {
-            repository.loadCurrentColumnColors(imageId)
-                .onSuccess { column ->
-                    _workingColumnState.value = WorkingColumnState.Content(column)
+            repository.loadWorkingColumnColors(imageId, workingColumnCapacity)
+                .onSuccess { window ->
+                    _workingColumnState.value = WorkingColumnState.Content(window)
                 }
                 .onFailure { error ->
                     _workingColumnState.value = WorkingColumnState.Error(
@@ -231,10 +236,11 @@ class ImagePickerViewModel(
     fun changeWorkingColumn(imageId: String, targetColumn: Int) {
         if (_isChangingWorkingColumn.value) return
         val content = _workingColumnState.value as? WorkingColumnState.Content ?: return
-        if (targetColumn !in 0 until content.beadColumn.totalColumns) return
-        if (targetColumn == content.beadColumn.column) return
+        if (targetColumn !in 0 until content.window.totalColumns) return
+        if (targetColumn == content.window.currentColumn) return
 
         workingColumnJob?.cancel()
+        val requestId = ++workingColumnRequestId
         _isChangingWorkingColumn.value = true
         workingColumnJob = viewModelScope.launch {
             try {
@@ -245,9 +251,9 @@ class ImagePickerViewModel(
                         )
                         return@launch
                     }
-                repository.loadCurrentColumnColors(imageId)
-                    .onSuccess { column ->
-                        _workingColumnState.value = WorkingColumnState.Content(column)
+                repository.loadWorkingColumnColors(imageId, workingColumnCapacity)
+                    .onSuccess { window ->
+                        _workingColumnState.value = WorkingColumnState.Content(window)
                     }
                     .onFailure { error ->
                         _workingColumnState.value = WorkingColumnState.Error(
@@ -255,7 +261,37 @@ class ImagePickerViewModel(
                         )
                     }
             } finally {
-                _isChangingWorkingColumn.value = false
+                if (requestId == workingColumnRequestId) {
+                    _isChangingWorkingColumn.value = false
+                }
+            }
+        }
+    }
+
+    fun updateWorkingColumnCapacity(imageId: String, capacity: Int) {
+        val normalizedCapacity = capacity.coerceAtLeast(1)
+        if (normalizedCapacity == workingColumnCapacity) return
+        val content = _workingColumnState.value as? WorkingColumnState.Content ?: return
+
+        workingColumnCapacity = normalizedCapacity
+        workingColumnJob?.cancel()
+        val requestId = ++workingColumnRequestId
+        _isChangingWorkingColumn.value = true
+        workingColumnJob = viewModelScope.launch {
+            try {
+                repository.loadWorkingColumnColors(imageId, workingColumnCapacity)
+                    .onSuccess { window ->
+                        _workingColumnState.value = WorkingColumnState.Content(window)
+                    }
+                    .onFailure { error ->
+                        _workingColumnState.value = WorkingColumnState.Error(
+                            error.message ?: "Could not calculate neighboring columns"
+                        )
+                    }
+            } finally {
+                if (requestId == workingColumnRequestId) {
+                    _isChangingWorkingColumn.value = false
+                }
             }
         }
     }

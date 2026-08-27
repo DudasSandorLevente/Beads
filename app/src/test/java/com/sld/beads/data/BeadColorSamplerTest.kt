@@ -67,4 +67,30 @@ class BeadColorSamplerTest {
             currentColumn = 2
         ) { _, _ -> 0 }
     }
+
+    @Test
+    fun visibleRange_centersAndShiftsAtEdges() {
+        assertEquals(3..7, calculateVisibleColumnRange(5, 10, 5))
+        assertEquals(0..4, calculateVisibleColumnRange(0, 10, 5))
+        assertEquals(5..9, calculateVisibleColumnRange(9, 10, 5))
+    }
+
+    @Test
+    fun visibleRange_neverExceedsTotalColumns() {
+        assertEquals(0..2, calculateVisibleColumnRange(1, 3, 10))
+    }
+
+    @Test
+    fun columnWindow_samplesColumnsInLeftToRightOrder() {
+        val window = sampleBeadColumnWindow(
+            workingArea = WorkingArea(0, 0, 100, 20),
+            beadGridSize = BeadGridSize(10, 2),
+            currentColumn = 5,
+            capacity = 3
+        ) { x, y -> x * 100 + y }
+
+        assertEquals(5, window.currentColumn)
+        assertEquals(listOf(4, 5, 6), window.columns.map(BeadColumn::column))
+        assertEquals(listOf(4505, 5505, 6505), window.columns.map { it.colors.first().argb })
+    }
 }

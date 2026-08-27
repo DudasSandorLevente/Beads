@@ -11,15 +11,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sld.beads.ImagePickerViewModel
@@ -28,6 +33,17 @@ import com.sld.beads.WorkingColumnState
 internal data class BeadColumnLayout(val squareSize: Dp, val gap: Dp)
 
 internal fun displayedColumnNumber(zeroBasedColumn: Int): Int = zeroBasedColumn + 1
+
+internal fun calculateVisibleColumnCapacity(
+    availableWidth: Dp,
+    squareSize: Dp,
+    gap: Dp,
+    totalColumns: Int
+): Int {
+    if (totalColumns <= 0 || squareSize <= 0.dp) return 1
+    val capacity = ((availableWidth.value + gap.value) / (squareSize.value + gap.value)).toInt()
+    return capacity.coerceIn(1, totalColumns)
+}
 
 internal fun calculateBeadColumnLayout(
     availableWidth: Dp,
@@ -57,13 +73,27 @@ fun WorkingView(
 ) {
     val state by viewModel.workingColumnState.collectAsState()
     val isChangingColumn by viewModel.isChangingWorkingColumn.collectAsState()
+    var showNeighbors by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(imageId) { viewModel.loadWorkingColumn(imageId) }
 
     Column(
         modifier = modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        Button(onClick = onBack) { Text("Back") }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Button(onClick = onBack) { Text("Back") }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = showNeighbors,
+                    onCheckedChange = { showNeighbors = it }
+                )
+                Text("Neighbors")
+            }
+        }
 
         when (val currentState = state) {
             WorkingColumnState.Idle,
@@ -79,7 +109,8 @@ fun WorkingView(
                 }
             }
             is WorkingColumnState.Content -> {
-                val colors = currentState.beadColumn.colors
+                val window = currentState.window
+                val rowCount = window.columns.firstOrNull()?.colors?.size ?: 0
                 BoxWithConstraints(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     contentAlignment = Alignment.Center
@@ -87,18 +118,46 @@ fun WorkingView(
                     val layout = calculateBeadColumnLayout(
                         availableWidth = maxWidth,
                         availableHeight = maxHeight,
-                        beadCount = colors.size
+                        beadCount = rowCount
                     )
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(layout.gap),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    val horizontalGap = 2.dp
+                    val visibleCapacity = calculateVisibleColumnCapacity(
+                        availableWidth = maxWidth,
+                        squareSize = layout.squareSize,
+                        gap = horizontalGap,
+                        totalColumns = window.totalColumns
+                    )
+                    LaunchedEffect(showNeighbors, visibleCapacity, imageId) {
+                        viewModel.updateWorkingColumnCapacity(
+                            imageId = imageId,
+                            capacity = if (showNeighbors) visibleCapacity else 1
+                        )
+                    }
+                    val displayedColumns = if (showNeighbors) {
+                        window.columns
+                    } else {
+                        window.columns.filter { it.column == window.currentColumn }
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(horizontalGap),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        colors.forEach { beadColor ->
-                            Box(
-                                modifier = Modifier
-                                    .size(layout.squareSize)
-                                    .background(Color(beadColor.argb))
-                            )
+                        displayedColumns.forEach { beadColumn ->
+                            Column(
+                                modifier = Modifier.alpha(
+                                    if (beadColumn.column == window.currentColumn) 1f else 0.4f
+                                ),
+                                verticalArrangement = Arrangement.spacedBy(layout.gap),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                beadColumn.colors.forEach { beadColor ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(layout.squareSize)
+                                            .background(Color(beadColor.argb))
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -109,21 +168,21 @@ fun WorkingView(
                 ) {
                     Button(
                         onClick = {
-                            viewModel.changeWorkingColumn(imageId, currentState.beadColumn.column - 1)
+                            viewModel.changeWorkingColumn(imageId, window.currentColumn - 1)
                         },
-                        enabled = !isChangingColumn && currentState.beadColumn.column > 0
+                        enabled = !isChangingColumn && window.currentColumn > 0
                     ) {
                         Text("←")
                     }
                     Text(
-                        "${displayedColumnNumber(currentState.beadColumn.column)}/${currentState.beadColumn.totalColumns}"
+                        "${displayedColumnNumber(window.currentColumn)}/${window.totalColumns}"
                     )
                     Button(
                         onClick = {
-                            viewModel.changeWorkingColumn(imageId, currentState.beadColumn.column + 1)
+                            viewModel.changeWorkingColumn(imageId, window.currentColumn + 1)
                         },
                         enabled = !isChangingColumn &&
-                            currentState.beadColumn.column < currentState.beadColumn.totalColumns - 1
+                            window.currentColumn < window.totalColumns - 1
                     ) {
                         Text("→")
                     }

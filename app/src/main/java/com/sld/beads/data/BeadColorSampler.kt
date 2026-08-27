@@ -16,6 +16,27 @@ data class BeadColumn(
     val colors: List<BeadColor>
 )
 
+data class BeadColumnWindow(
+    val currentColumn: Int,
+    val totalColumns: Int,
+    val columns: List<BeadColumn>
+)
+
+fun calculateVisibleColumnRange(
+    currentColumn: Int,
+    totalColumns: Int,
+    capacity: Int
+): IntRange {
+    require(totalColumns > 0)
+    require(currentColumn in 0 until totalColumns)
+    require(capacity > 0)
+
+    val visibleCount = minOf(capacity, totalColumns)
+    val preferredStart = currentColumn - visibleCount / 2
+    val start = preferredStart.coerceIn(0, totalColumns - visibleCount)
+    return start..<(start + visibleCount)
+}
+
 fun sampleBeadColumn(
     workingArea: WorkingArea,
     beadGridSize: BeadGridSize,
@@ -55,5 +76,31 @@ fun sampleBeadColumn(
         column = currentColumn,
         totalColumns = beadGridSize.width,
         colors = colors
+    )
+}
+
+fun sampleBeadColumnWindow(
+    workingArea: WorkingArea,
+    beadGridSize: BeadGridSize,
+    currentColumn: Int,
+    capacity: Int,
+    pixelAt: (x: Int, y: Int) -> Int
+): BeadColumnWindow {
+    val range = calculateVisibleColumnRange(
+        currentColumn = currentColumn,
+        totalColumns = beadGridSize.width,
+        capacity = capacity
+    )
+    return BeadColumnWindow(
+        currentColumn = currentColumn,
+        totalColumns = beadGridSize.width,
+        columns = range.map { column ->
+            sampleBeadColumn(
+                workingArea = workingArea,
+                beadGridSize = beadGridSize,
+                currentColumn = column,
+                pixelAt = pixelAt
+            )
+        }
     )
 }
