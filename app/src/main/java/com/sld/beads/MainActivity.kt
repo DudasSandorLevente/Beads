@@ -20,24 +20,35 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sld.beads.data.BeadsDatabase
+import com.sld.beads.data.ImageRepository
 import com.sld.beads.ui.theme.BeadsTheme
+import java.io.File
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val database = BeadsDatabase.getInstance(applicationContext)
+        val viewModelFactory = ImagePickerViewModelFactory(
+            repository = ImageRepository(applicationContext, database.imageDao()),
+            imageDao = database.imageDao()
+        )
         setContent {
             BeadsTheme {
+                val imagePickerViewModel: ImagePickerViewModel = viewModel(factory = viewModelFactory)
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    ImagePickerScreen(modifier = Modifier.padding(innerPadding))
+                    ImagePickerScreen(
+                        viewModel = imagePickerViewModel,
+                        modifier = Modifier.padding(innerPadding)
+                    )
                 }
             }
         }
@@ -45,14 +56,18 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun ImagePickerScreen(modifier: Modifier = Modifier) {
-    // Store a String because it can be saved and restored by rememberSaveable.
-    var selectedImageUri by rememberSaveable { mutableStateOf<String?>(null) }
+fun ImagePickerScreen(
+    viewModel: ImagePickerViewModel,
+    modifier: Modifier = Modifier
+) {
+    val latestImage by viewModel.latestImage.collectAsState()
+    val isImporting by viewModel.isImporting.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
 
     val photoPicker = rememberLauncherForActivityResult(
         contract = PickVisualMedia()
     ) { uri: Uri? ->
-        selectedImageUri = uri?.toString()
+        uri?.let(viewModel::importImage)
     }
 
     Column(
@@ -61,17 +76,20 @@ fun ImagePickerScreen(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         Button(
+            enabled = !isImporting,
             onClick = {
                 photoPicker.launch(
                     PickVisualMediaRequest(PickVisualMedia.ImageOnly)
                 )
             }
         ) {
-            Text("Choose a photo")
+            Text(if (isImporting) "Saving…" else "Choose a photo")
         }
 
-        selectedImageUri?.let { uriString ->
-            val uri = Uri.parse(uriString)
+        errorMessage?.let { Text(it) }
+
+        latestImage?.let { image ->
+            val uri = Uri.fromFile(File(image.localPath))
 
             AndroidView(
                 factory = { context ->
@@ -85,10 +103,7 @@ fun ImagePickerScreen(modifier: Modifier = Modifier) {
                     .size(280.dp)
             )
 
-            Text("Selected image: $uriString")
-
-            // Pass `uri` to the next processing step here, for example:
-            // processImage(context, uri)
+            Text("Image ID: ${image.id}")
         }
     }
 }
