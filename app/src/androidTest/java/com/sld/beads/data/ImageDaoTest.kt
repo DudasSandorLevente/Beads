@@ -69,6 +69,7 @@ class ImageDaoTest {
 
         val updatedRows = dao.updateConfiguration(
             id = "one",
+            name = "My project",
             workingAreaX = 10,
             workingAreaY = 20,
             workingAreaWidth = 300,
@@ -79,6 +80,7 @@ class ImageDaoTest {
 
         val updated = dao.findById("one")
         assertEquals(1, updatedRows)
+        assertEquals("My project", updated?.name)
         assertEquals(10, updated?.workingAreaX)
         assertEquals(20, updated?.workingAreaY)
         assertEquals(300, updated?.workingAreaWidth)
@@ -115,7 +117,7 @@ class ImageDaoTest {
     fun savingConfiguration_resetsCurrentColumn() = runBlocking {
         dao.insert(configuredRecord(id = "one", beadWidth = 10, currentColumn = 5))
 
-        dao.updateConfiguration("one", 1, 2, 3, 4, 20, 30)
+        dao.updateConfiguration("one", "Renamed project", 1, 2, 3, 4, 20, 30)
 
         assertEquals(0, dao.findById("one")?.currentColumn)
     }
@@ -171,6 +173,7 @@ class ImageDaoTest {
         sourceUri = "content://photos/$id",
         localPath = "/images/$id",
         createdAt = createdAt,
+        name = id,
         workingAreaX = 0,
         workingAreaY = 0,
         workingAreaWidth = 100,

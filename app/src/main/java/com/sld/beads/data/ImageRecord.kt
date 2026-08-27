@@ -14,6 +14,7 @@ data class ImageRecord(
     val sourceUri: String,
     val localPath: String,
     val createdAt: Long,
+    val name: String? = null,
     val workingAreaX: Int? = null,
     val workingAreaY: Int? = null,
     val workingAreaWidth: Int? = null,

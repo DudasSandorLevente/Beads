@@ -159,6 +159,12 @@ private fun ImageListItem(image: ImageRecord, onClick: () -> Unit) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        Text(
+            text = image.name.orEmpty(),
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
         PersistedImage(
             path = image.localPath,
             modifier = Modifier.fillMaxWidth(),

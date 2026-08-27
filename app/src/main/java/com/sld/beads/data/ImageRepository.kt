@@ -51,10 +51,14 @@ class ImageRepository(
 
     suspend fun saveConfiguration(
         imageId: String,
+        name: String,
         workingArea: WorkingArea,
         beadGridSize: BeadGridSize
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
+            val trimmedName = name.trim()
+            require(trimmedName.isNotEmpty()) { "Name is required" }
+            require(trimmedName.length <= 80) { "Name must be 80 characters or fewer" }
             val record = imageDao.findById(imageId)
                 ?: throw IllegalArgumentException("The selected image no longer exists")
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -73,6 +77,7 @@ class ImageRepository(
 
             val updatedRows = imageDao.updateConfiguration(
                 id = imageId,
+                name = trimmedName,
                 workingAreaX = workingArea.x,
                 workingAreaY = workingArea.y,
                 workingAreaWidth = workingArea.width,

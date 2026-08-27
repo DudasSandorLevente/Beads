@@ -23,6 +23,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 
 data class ConfigurationFormState(
+    val name: String = "",
+    val nameError: String? = null,
     val values: Map<ConfigurationField, String> = ConfigurationField.entries.associateWith { "" },
     val errors: Map<ConfigurationField, String> = emptyMap(),
     val isSaving: Boolean = false,
@@ -88,6 +90,7 @@ class ImagePickerViewModel(
                 if (image != null && image.id != loadedImageId) {
                     loadedImageId = image.id
                     _formState.value = ConfigurationFormState(
+                        name = image.name.orEmpty(),
                         values = mapOf(
                             ConfigurationField.WORKING_AREA_X to image.workingAreaX.asInput(),
                             ConfigurationField.WORKING_AREA_Y to image.workingAreaY.asInput(),
@@ -142,12 +145,26 @@ class ImagePickerViewModel(
         )
     }
 
+    fun updateName(value: String) {
+        _formState.value = _formState.value.copy(
+            name = value,
+            nameError = null,
+            wasSaved = false
+        )
+    }
+
     fun saveConfiguration() {
         val image = latestImage.value ?: return
         if (_formState.value.isSaving) return
 
         val parsedValues = mutableMapOf<ConfigurationField, Int>()
         val parsingErrors = mutableMapOf<ConfigurationField, String>()
+        val trimmedName = _formState.value.name.trim()
+        val nameError = when {
+            trimmedName.isEmpty() -> "Required"
+            trimmedName.length > 80 -> "Must be 80 characters or fewer"
+            else -> null
+        }
         ConfigurationField.entries.forEach { field ->
             val rawValue = _formState.value.values[field].orEmpty()
             val value = rawValue.toIntOrNull()
@@ -155,8 +172,12 @@ class ImagePickerViewModel(
             else if (value == null) parsingErrors[field] = "Enter a valid whole number"
             else parsedValues[field] = value
         }
-        if (parsingErrors.isNotEmpty()) {
-            _formState.value = _formState.value.copy(errors = parsingErrors, wasSaved = false)
+        if (parsingErrors.isNotEmpty() || nameError != null) {
+            _formState.value = _formState.value.copy(
+                nameError = nameError,
+                errors = parsingErrors,
+                wasSaved = false
+            )
             return
         }
 
@@ -165,6 +186,7 @@ class ImagePickerViewModel(
             _errorMessage.value = null
             repository.saveConfiguration(
                 imageId = image.id,
+                name = trimmedName,
                 workingArea = WorkingArea(
                     x = parsedValues.getValue(ConfigurationField.WORKING_AREA_X),
                     y = parsedValues.getValue(ConfigurationField.WORKING_AREA_Y),

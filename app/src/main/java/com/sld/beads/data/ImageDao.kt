@@ -22,7 +22,9 @@ interface ImageDao {
     @Query(
         """
         SELECT * FROM images
-        WHERE workingAreaX IS NOT NULL
+        WHERE name IS NOT NULL
+            AND TRIM(name) != ''
+            AND workingAreaX IS NOT NULL
             AND workingAreaY IS NOT NULL
             AND workingAreaWidth IS NOT NULL
             AND workingAreaHeight IS NOT NULL
@@ -38,6 +40,7 @@ interface ImageDao {
         DELETE FROM images
         WHERE id = :id
             AND (
+                name IS NULL OR TRIM(name) = '' OR
                 workingAreaX IS NULL OR workingAreaY IS NULL OR
                 workingAreaWidth IS NULL OR workingAreaHeight IS NULL OR
                 beadWidth IS NULL OR beadHeight IS NULL
@@ -52,6 +55,7 @@ interface ImageDao {
     @Query(
         """
         UPDATE images SET
+            name = :name,
             workingAreaX = :workingAreaX,
             workingAreaY = :workingAreaY,
             workingAreaWidth = :workingAreaWidth,
@@ -64,6 +68,7 @@ interface ImageDao {
     )
     suspend fun updateConfiguration(
         id: String,
+        name: String,
         workingAreaX: Int,
         workingAreaY: Int,
         workingAreaWidth: Int,

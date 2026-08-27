@@ -78,7 +78,15 @@ fun CreateView(
                 path = image.localPath,
                 modifier = Modifier.fillMaxWidth().size(280.dp)
             )
-            Text("Image ID: ${image.id}")
+            OutlinedTextField(
+                value = formState.name,
+                onValueChange = viewModel::updateName,
+                label = { Text("Name") },
+                singleLine = true,
+                isError = formState.nameError != null,
+                supportingText = formState.nameError?.let { message -> { Text(message) } },
+                modifier = Modifier.fillMaxWidth()
+            )
             Text("Working area (pixels)")
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
