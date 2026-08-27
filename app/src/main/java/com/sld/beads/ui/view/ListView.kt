@@ -168,7 +168,8 @@ private fun ImageListItem(image: ImageRecord, onClick: () -> Unit) {
         PersistedImage(
             path = image.localPath,
             modifier = Modifier.fillMaxWidth(),
-            fitWidth = true
+            fitWidth = true,
+            crop = image.workingAreaCrop()
         )
         Text(
             text = formatImageMetadata(image),
@@ -176,6 +177,14 @@ private fun ImageListItem(image: ImageRecord, onClick: () -> Unit) {
             overflow = TextOverflow.Ellipsis
         )
     }
+}
+
+private fun ImageRecord.workingAreaCrop(): ImageCrop? {
+    val x = workingAreaX ?: return null
+    val y = workingAreaY ?: return null
+    val width = workingAreaWidth ?: return null
+    val height = workingAreaHeight ?: return null
+    return ImageCrop(x = x, y = y, width = width, height = height)
 }
 
 internal fun formatImageMetadata(image: ImageRecord): String {
