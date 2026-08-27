@@ -27,7 +27,8 @@ interface ImageDao {
             workingAreaWidth = :workingAreaWidth,
             workingAreaHeight = :workingAreaHeight,
             beadWidth = :beadWidth,
-            beadHeight = :beadHeight
+            beadHeight = :beadHeight,
+            currentColumn = 0
         WHERE id = :id
         """
     )
@@ -40,4 +41,25 @@ interface ImageDao {
         beadWidth: Int,
         beadHeight: Int
     ): Int
+
+    @Query(
+        """
+        UPDATE images SET currentColumn = :currentColumn
+        WHERE id = :id
+            AND beadWidth IS NOT NULL
+            AND :currentColumn >= 0
+            AND :currentColumn < beadWidth
+        """
+    )
+    suspend fun setCurrentColumn(id: String, currentColumn: Int): Int
+
+    @Query(
+        """
+        UPDATE images SET currentColumn = currentColumn + 1
+        WHERE id = :id
+            AND beadWidth IS NOT NULL
+            AND currentColumn < beadWidth - 1
+        """
+    )
+    suspend fun advanceCurrentColumn(id: String): Int
 }

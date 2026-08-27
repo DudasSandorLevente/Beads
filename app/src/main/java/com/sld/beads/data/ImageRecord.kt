@@ -3,6 +3,7 @@ package com.sld.beads.data
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import androidx.room.ColumnInfo
 
 @Entity(
     tableName = "images",
@@ -18,5 +19,6 @@ data class ImageRecord(
     val workingAreaWidth: Int? = null,
     val workingAreaHeight: Int? = null,
     val beadWidth: Int? = null,
-    val beadHeight: Int? = null
+    val beadHeight: Int? = null,
+    @ColumnInfo(defaultValue = "0") val currentColumn: Int = 0
 )

@@ -88,4 +88,48 @@ class ImageRepository(
             Result.failure(error)
         }
     }
+
+    suspend fun setCurrentColumn(imageId: String, column: Int): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                val record = imageDao.findById(imageId)
+                    ?: throw IllegalArgumentException("The selected image no longer exists")
+                val beadWidth = record.beadWidth
+                    ?: throw IllegalStateException("Save the bead grid size before changing columns")
+                require(column in 0 until beadWidth) {
+                    "Current column must be between 0 and ${beadWidth - 1}"
+                }
+                if (imageDao.setCurrentColumn(imageId, column) != 1) {
+                    throw IOException("Could not update the current column")
+                }
+                Result.success(Unit)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Result.failure(error)
+            }
+        }
+
+    suspend fun advanceCurrentColumn(imageId: String): Result<Int> =
+        withContext(Dispatchers.IO) {
+            try {
+                val record = imageDao.findById(imageId)
+                    ?: throw IllegalArgumentException("The selected image no longer exists")
+                val beadWidth = record.beadWidth
+                    ?: throw IllegalStateException("Save the bead grid size before changing columns")
+                if (record.currentColumn >= beadWidth - 1) {
+                    throw IllegalStateException("The image is already at its last column")
+                }
+                if (imageDao.advanceCurrentColumn(imageId) != 1) {
+                    throw IOException("Could not advance the current column")
+                }
+                imageDao.findById(imageId)?.currentColumn
+                    ?.let(Result.Companion::success)
+                    ?: Result.failure(IOException("Could not read the updated current column"))
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Result.failure(error)
+            }
+        }
 }
