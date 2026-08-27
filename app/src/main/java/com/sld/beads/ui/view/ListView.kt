@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -30,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sld.beads.ImagePickerViewModel
 import com.sld.beads.data.ImageRecord
@@ -151,19 +151,29 @@ private fun SwipeableImageListItem(
 
 @Composable
 private fun ImageListItem(image: ImageRecord, onClick: () -> Unit) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
             .clickable(onClick = onClick)
             .padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        PersistedImage(path = image.localPath, modifier = Modifier.size(88.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Grid: ${image.beadWidth} × ${image.beadHeight}")
-            Text("Current column: ${image.currentColumn}")
-        }
+        PersistedImage(
+            path = image.localPath,
+            modifier = Modifier.fillMaxWidth(),
+            fitWidth = true
+        )
+        Text(
+            text = formatImageMetadata(image),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
+}
+
+internal fun formatImageMetadata(image: ImageRecord): String {
+    val width = image.beadWidth?.toString() ?: "?"
+    val height = image.beadHeight?.toString() ?: "?"
+    return "Grid: $width×$height · Column: ${image.currentColumn + 1}/$width"
 }
