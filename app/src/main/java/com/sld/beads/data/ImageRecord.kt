@@ -12,5 +12,11 @@ data class ImageRecord(
     @PrimaryKey val id: String,
     val sourceUri: String,
     val localPath: String,
-    val createdAt: Long
+    val createdAt: Long,
+    val workingAreaX: Int? = null,
+    val workingAreaY: Int? = null,
+    val workingAreaWidth: Int? = null,
+    val workingAreaHeight: Int? = null,
+    val beadWidth: Int? = null,
+    val beadHeight: Int? = null
 )

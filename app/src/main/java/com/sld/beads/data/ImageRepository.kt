@@ -2,6 +2,7 @@ package com.sld.beads.data
 
 import android.content.Context
 import android.net.Uri
+import android.graphics.BitmapFactory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -45,6 +46,46 @@ class ImageRepository(
             destination.delete()
             val existing = imageDao.findBySourceUri(sourceUriString)
             if (existing != null) Result.success(existing) else Result.failure(error)
+        }
+    }
+
+    suspend fun saveConfiguration(
+        imageId: String,
+        workingArea: WorkingArea,
+        beadGridSize: BeadGridSize
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val record = imageDao.findById(imageId)
+                ?: throw IllegalArgumentException("The selected image no longer exists")
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(record.localPath, bounds)
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                throw IOException("Could not read the saved image dimensions")
+            }
+
+            val errors = validateConfiguration(
+                workingArea = workingArea,
+                beadGridSize = beadGridSize,
+                imageWidth = bounds.outWidth,
+                imageHeight = bounds.outHeight
+            )
+            if (errors.isNotEmpty()) throw ConfigurationValidationException(errors)
+
+            val updatedRows = imageDao.updateConfiguration(
+                id = imageId,
+                workingAreaX = workingArea.x,
+                workingAreaY = workingArea.y,
+                workingAreaWidth = workingArea.width,
+                workingAreaHeight = workingArea.height,
+                beadWidth = beadGridSize.width,
+                beadHeight = beadGridSize.height
+            )
+            if (updatedRows != 1) throw IOException("Could not update the image configuration")
+            Result.success(Unit)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Result.failure(error)
         }
     }
 }

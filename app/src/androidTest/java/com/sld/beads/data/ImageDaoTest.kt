@@ -62,6 +62,30 @@ class ImageDaoTest {
         assertEquals(listOf("one"), dao.observeAll().first().map(ImageRecord::id))
     }
 
+    @Test
+    fun updateConfiguration_updatesAllValuesOnSelectedRecord() = runBlocking {
+        dao.insert(record(id = "one", sourceUri = "content://photos/one", createdAt = 1))
+
+        val updatedRows = dao.updateConfiguration(
+            id = "one",
+            workingAreaX = 10,
+            workingAreaY = 20,
+            workingAreaWidth = 300,
+            workingAreaHeight = 400,
+            beadWidth = 30,
+            beadHeight = 40
+        )
+
+        val updated = dao.findById("one")
+        assertEquals(1, updatedRows)
+        assertEquals(10, updated?.workingAreaX)
+        assertEquals(20, updated?.workingAreaY)
+        assertEquals(300, updated?.workingAreaWidth)
+        assertEquals(400, updated?.workingAreaHeight)
+        assertEquals(30, updated?.beadWidth)
+        assertEquals(40, updated?.beadHeight)
+    }
+
     private fun record(id: String, sourceUri: String, createdAt: Long) = ImageRecord(
         id = id,
         sourceUri = sourceUri,

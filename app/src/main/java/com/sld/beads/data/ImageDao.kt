@@ -18,4 +18,26 @@ interface ImageDao {
 
     @Query("SELECT * FROM images ORDER BY createdAt DESC")
     fun observeAll(): Flow<List<ImageRecord>>
+
+    @Query(
+        """
+        UPDATE images SET
+            workingAreaX = :workingAreaX,
+            workingAreaY = :workingAreaY,
+            workingAreaWidth = :workingAreaWidth,
+            workingAreaHeight = :workingAreaHeight,
+            beadWidth = :beadWidth,
+            beadHeight = :beadHeight
+        WHERE id = :id
+        """
+    )
+    suspend fun updateConfiguration(
+        id: String,
+        workingAreaX: Int,
+        workingAreaY: Int,
+        workingAreaWidth: Int,
+        workingAreaHeight: Int,
+        beadWidth: Int,
+        beadHeight: Int
+    ): Int
 }
