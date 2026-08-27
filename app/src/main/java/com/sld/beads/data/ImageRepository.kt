@@ -167,4 +167,52 @@ class ImageRepository(
             Result.failure(error)
         }
     }
+
+    suspend fun loadCurrentColumnColors(imageId: String): Result<BeadColumn> =
+        withContext(Dispatchers.IO) {
+            var bitmap: android.graphics.Bitmap? = null
+            try {
+                val record = imageDao.findById(imageId)
+                    ?: throw IllegalArgumentException("The selected image no longer exists")
+                val workingArea = WorkingArea(
+                    x = record.workingAreaX ?: throw IllegalStateException("Working area is not configured"),
+                    y = record.workingAreaY ?: throw IllegalStateException("Working area is not configured"),
+                    width = record.workingAreaWidth ?: throw IllegalStateException("Working area is not configured"),
+                    height = record.workingAreaHeight ?: throw IllegalStateException("Working area is not configured")
+                )
+                val beadGridSize = BeadGridSize(
+                    width = record.beadWidth ?: throw IllegalStateException("Bead grid is not configured"),
+                    height = record.beadHeight ?: throw IllegalStateException("Bead grid is not configured")
+                )
+
+                bitmap = BitmapFactory.decodeFile(
+                    record.localPath,
+                    BitmapFactory.Options().apply {
+                        inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
+                    }
+                ) ?: throw IOException("Could not decode the saved image")
+
+                if (workingArea.x < 0 || workingArea.y < 0 ||
+                    workingArea.x.toLong() + workingArea.width > bitmap.width ||
+                    workingArea.y.toLong() + workingArea.height > bitmap.height
+                ) {
+                    throw IllegalStateException("Working area is outside the saved image")
+                }
+
+                Result.success(
+                    sampleBeadColumn(
+                        workingArea = workingArea,
+                        beadGridSize = beadGridSize,
+                        currentColumn = record.currentColumn,
+                        pixelAt = bitmap::getPixel
+                    )
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Result.failure(error)
+            } finally {
+                bitmap?.recycle()
+            }
+        }
 }

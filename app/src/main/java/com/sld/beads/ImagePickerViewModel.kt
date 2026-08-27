@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.sld.beads.data.BeadGridSize
+import com.sld.beads.data.BeadColumn
 import com.sld.beads.data.ConfigurationField
 import com.sld.beads.data.ConfigurationValidationException
 import com.sld.beads.data.ImageDao
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 
 data class ConfigurationFormState(
     val values: Map<ConfigurationField, String> = ConfigurationField.entries.associateWith { "" },
@@ -26,6 +28,13 @@ data class ConfigurationFormState(
     val isSaving: Boolean = false,
     val wasSaved: Boolean = false
 )
+
+sealed interface WorkingColumnState {
+    data object Idle : WorkingColumnState
+    data object Loading : WorkingColumnState
+    data class Content(val beadColumn: BeadColumn) : WorkingColumnState
+    data class Error(val message: String) : WorkingColumnState
+}
 
 class ImagePickerViewModel(
     private val repository: ImageRepository,
@@ -49,6 +58,9 @@ class ImagePickerViewModel(
     private val _deletionError = MutableStateFlow<String?>(null)
     val deletionError: StateFlow<String?> = _deletionError
 
+    private val _workingColumnState = MutableStateFlow<WorkingColumnState>(WorkingColumnState.Idle)
+    val workingColumnState: StateFlow<WorkingColumnState> = _workingColumnState
+
     private val _savedImageIds = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val savedImageIds: SharedFlow<String> = _savedImageIds
 
@@ -63,6 +75,7 @@ class ImagePickerViewModel(
 
     private var loadedImageId: String? = null
     private var isCreateActive = false
+    private var workingColumnJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -193,6 +206,22 @@ class ImagePickerViewModel(
                     _deletionError.value = error.message ?: "Could not delete the project"
                 }
             _deletingImageIds.value -= imageId
+        }
+    }
+
+    fun loadWorkingColumn(imageId: String) {
+        workingColumnJob?.cancel()
+        _workingColumnState.value = WorkingColumnState.Loading
+        workingColumnJob = viewModelScope.launch {
+            repository.loadCurrentColumnColors(imageId)
+                .onSuccess { column ->
+                    _workingColumnState.value = WorkingColumnState.Content(column)
+                }
+                .onFailure { error ->
+                    _workingColumnState.value = WorkingColumnState.Error(
+                        error.message ?: "Could not calculate bead colors"
+                    )
+                }
         }
     }
 

@@ -80,6 +80,7 @@ private fun BeadsApp(viewModel: ImagePickerViewModel) {
             ) { backStackEntry ->
                 WorkingView(
                     imageId = backStackEntry.arguments?.getString("imageId").orEmpty(),
+                    viewModel = viewModel,
                     onBack = { navController.popBackStack() }
                 )
             }
