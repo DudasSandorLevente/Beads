@@ -21,6 +21,33 @@ interface ImageDao {
 
     @Query(
         """
+        SELECT * FROM images
+        WHERE workingAreaX IS NOT NULL
+            AND workingAreaY IS NOT NULL
+            AND workingAreaWidth IS NOT NULL
+            AND workingAreaHeight IS NOT NULL
+            AND beadWidth IS NOT NULL
+            AND beadHeight IS NOT NULL
+        ORDER BY createdAt DESC
+        """
+    )
+    fun observeConfigured(): Flow<List<ImageRecord>>
+
+    @Query(
+        """
+        DELETE FROM images
+        WHERE id = :id
+            AND (
+                workingAreaX IS NULL OR workingAreaY IS NULL OR
+                workingAreaWidth IS NULL OR workingAreaHeight IS NULL OR
+                beadWidth IS NULL OR beadHeight IS NULL
+            )
+        """
+    )
+    suspend fun deleteIncompleteById(id: String): Int
+
+    @Query(
+        """
         UPDATE images SET
             workingAreaX = :workingAreaX,
             workingAreaY = :workingAreaY,

@@ -132,4 +132,22 @@ class ImageRepository(
                 Result.failure(error)
             }
         }
+
+    suspend fun discardIncompleteImage(imageId: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                val record = imageDao.findById(imageId) ?: return@withContext Result.success(Unit)
+                if (imageDao.deleteIncompleteById(imageId) == 1) {
+                    val imageFile = File(record.localPath)
+                    if (imageFile.exists() && !imageFile.delete()) {
+                        throw IOException("Could not delete the abandoned image")
+                    }
+                }
+                Result.success(Unit)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Result.failure(error)
+            }
+        }
 }

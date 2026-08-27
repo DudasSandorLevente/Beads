@@ -12,6 +12,8 @@ import com.sld.beads.data.ImageRecord
 import com.sld.beads.data.ImageRepository
 import com.sld.beads.data.WorkingArea
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -35,8 +37,14 @@ class ImagePickerViewModel(
         imageDao.observeAll(),
         selectedImageId
     ) { images, selectedId ->
-        images.firstOrNull { it.id == selectedId } ?: images.firstOrNull()
+        images.firstOrNull { it.id == selectedId }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    val configuredImages: StateFlow<List<ImageRecord>> = imageDao.observeConfigured()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private val _savedImageIds = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val savedImageIds: SharedFlow<String> = _savedImageIds
 
     private val _isImporting = MutableStateFlow(false)
     val isImporting: StateFlow<Boolean> = _isImporting
@@ -48,6 +56,7 @@ class ImagePickerViewModel(
     val formState: StateFlow<ConfigurationFormState> = _formState
 
     private var loadedImageId: String? = null
+    private var isCreateActive = false
 
     init {
         viewModelScope.launch {
@@ -69,13 +78,32 @@ class ImagePickerViewModel(
         }
     }
 
+    fun startCreate() {
+        if (isCreateActive) return
+        isCreateActive = true
+        selectedImageId.value = null
+        loadedImageId = null
+        _formState.value = ConfigurationFormState()
+        _errorMessage.value = null
+    }
+
     fun importImage(uri: Uri) {
         if (_isImporting.value) return
         viewModelScope.launch {
             _isImporting.value = true
             _errorMessage.value = null
+            selectedImageId.value?.let { repository.discardIncompleteImage(it) }
+            selectedImageId.value = null
+            loadedImageId = null
+            _formState.value = ConfigurationFormState()
             repository.importImage(uri)
-                .onSuccess { selectedImageId.value = it.id }
+                .onSuccess { image ->
+                    if (isCreateActive) {
+                        selectedImageId.value = image.id
+                    } else {
+                        repository.discardIncompleteImage(image.id)
+                    }
+                }
                 .onFailure { _errorMessage.value = it.message ?: "Could not save the selected image" }
             _isImporting.value = false
         }
@@ -125,12 +153,26 @@ class ImagePickerViewModel(
                 )
             ).onSuccess {
                 _formState.value = _formState.value.copy(isSaving = false, wasSaved = true)
+                isCreateActive = false
+                _savedImageIds.tryEmit(image.id)
             }.onFailure { error ->
                 val fieldErrors = (error as? ConfigurationValidationException)?.errors.orEmpty()
                 _formState.value = _formState.value.copy(isSaving = false, errors = fieldErrors)
                 if (fieldErrors.isEmpty()) {
                     _errorMessage.value = error.message ?: "Could not save the configuration"
                 }
+            }
+        }
+    }
+
+    fun cancelCreate() {
+        isCreateActive = false
+        val imageId = selectedImageId.value ?: return
+        viewModelScope.launch {
+            repository.discardIncompleteImage(imageId)
+            if (selectedImageId.value == imageId) {
+                selectedImageId.value = null
+                loadedImageId = null
             }
         }
     }

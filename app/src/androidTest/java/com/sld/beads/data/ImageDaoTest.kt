@@ -120,6 +120,29 @@ class ImageDaoTest {
         assertEquals(0, dao.findById("one")?.currentColumn)
     }
 
+    @Test
+    fun observeConfigured_excludesIncompleteRecordsAndUsesNewestFirst() = runBlocking {
+        dao.insert(record(id = "draft", sourceUri = "content://photos/draft", createdAt = 3))
+        dao.insert(configuredRecord(id = "older", beadWidth = 10, currentColumn = 0, createdAt = 1))
+        dao.insert(configuredRecord(id = "newer", beadWidth = 20, currentColumn = 0, createdAt = 2))
+
+        assertEquals(
+            listOf("newer", "older"),
+            dao.observeConfigured().first().map(ImageRecord::id)
+        )
+    }
+
+    @Test
+    fun deleteIncompleteById_deletesDraftButPreservesConfiguredRecord() = runBlocking {
+        dao.insert(record(id = "draft", sourceUri = "content://photos/draft", createdAt = 1))
+        dao.insert(configuredRecord(id = "configured", beadWidth = 10, currentColumn = 0))
+
+        assertEquals(1, dao.deleteIncompleteById("draft"))
+        assertEquals(0, dao.deleteIncompleteById("configured"))
+        assertEquals(null, dao.findById("draft"))
+        assertNotNull(dao.findById("configured"))
+    }
+
     private fun record(id: String, sourceUri: String, createdAt: Long) = ImageRecord(
         id = id,
         sourceUri = sourceUri,
@@ -127,11 +150,16 @@ class ImageDaoTest {
         createdAt = createdAt
     )
 
-    private fun configuredRecord(id: String, beadWidth: Int, currentColumn: Int) = ImageRecord(
+    private fun configuredRecord(
+        id: String,
+        beadWidth: Int,
+        currentColumn: Int,
+        createdAt: Long = 1
+    ) = ImageRecord(
         id = id,
         sourceUri = "content://photos/$id",
         localPath = "/images/$id",
-        createdAt = 1,
+        createdAt = createdAt,
         workingAreaX = 0,
         workingAreaY = 0,
         workingAreaWidth = 100,
