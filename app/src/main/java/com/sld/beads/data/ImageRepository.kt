@@ -150,4 +150,21 @@ class ImageRepository(
                 Result.failure(error)
             }
         }
+
+    suspend fun deleteImage(imageId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val record = imageDao.findById(imageId) ?: return@withContext Result.success(Unit)
+            if (imageDao.deleteById(imageId) == 0) return@withContext Result.success(Unit)
+
+            val imageFile = File(record.localPath)
+            if (imageFile.exists() && !imageFile.delete()) {
+                throw IOException("Project deleted, but its image file could not be removed")
+            }
+            Result.success(Unit)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Result.failure(error)
+        }
+    }
 }

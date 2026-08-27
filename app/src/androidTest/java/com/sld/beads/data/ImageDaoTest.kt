@@ -143,6 +143,17 @@ class ImageDaoTest {
         assertNotNull(dao.findById("configured"))
     }
 
+    @Test
+    fun deleteById_deletesOnlyRequestedRecordAndIsIdempotent() = runBlocking {
+        dao.insert(configuredRecord(id = "delete", beadWidth = 10, currentColumn = 0))
+        dao.insert(configuredRecord(id = "keep", beadWidth = 10, currentColumn = 0))
+
+        assertEquals(1, dao.deleteById("delete"))
+        assertEquals(0, dao.deleteById("delete"))
+        assertEquals(null, dao.findById("delete"))
+        assertNotNull(dao.findById("keep"))
+    }
+
     private fun record(id: String, sourceUri: String, createdAt: Long) = ImageRecord(
         id = id,
         sourceUri = sourceUri,

@@ -46,6 +46,9 @@ interface ImageDao {
     )
     suspend fun deleteIncompleteById(id: String): Int
 
+    @Query("DELETE FROM images WHERE id = :id")
+    suspend fun deleteById(id: String): Int
+
     @Query(
         """
         UPDATE images SET

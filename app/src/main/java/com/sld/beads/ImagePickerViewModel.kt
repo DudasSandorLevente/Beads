@@ -43,6 +43,12 @@ class ImagePickerViewModel(
     val configuredImages: StateFlow<List<ImageRecord>> = imageDao.observeConfigured()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    private val _deletingImageIds = MutableStateFlow<Set<String>>(emptySet())
+    val deletingImageIds: StateFlow<Set<String>> = _deletingImageIds
+
+    private val _deletionError = MutableStateFlow<String?>(null)
+    val deletionError: StateFlow<String?> = _deletionError
+
     private val _savedImageIds = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val savedImageIds: SharedFlow<String> = _savedImageIds
 
@@ -174,6 +180,19 @@ class ImagePickerViewModel(
                 selectedImageId.value = null
                 loadedImageId = null
             }
+        }
+    }
+
+    fun deleteImage(imageId: String) {
+        if (imageId in _deletingImageIds.value) return
+        viewModelScope.launch {
+            _deletingImageIds.value += imageId
+            _deletionError.value = null
+            repository.deleteImage(imageId)
+                .onFailure { error ->
+                    _deletionError.value = error.message ?: "Could not delete the project"
+                }
+            _deletingImageIds.value -= imageId
         }
     }
 
