@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -24,11 +25,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.sld.beads.ConfigurationFormState
 import com.sld.beads.ImagePickerViewModel
 import com.sld.beads.data.ConfigurationField
+import androidx.compose.foundation.layout.imePadding
 
 @Composable
 fun CreateView(
@@ -54,21 +57,37 @@ fun CreateView(
     }
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+        modifier = modifier.fillMaxSize().imePadding().verticalScroll(
+            rememberScrollState()
+        ).padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         Text("Create project")
-        Button(
-            enabled = !isImporting,
-            onClick = {
-                photoPicker.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
-            }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(if (isImporting) "Importing..." else "Choose a photo")
+            Button(
+                onClick = {
+                    viewModel.cancelCreate()
+                    onBack()
+                },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Cancel")
+            }
+            Button(
+                enabled = !isImporting,
+                onClick = {
+                    photoPicker.launch(
+                        PickVisualMediaRequest(PickVisualMedia.ImageOnly)
+                    )
+                },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(if (isImporting) "Importing..." else "Choose a photo")
+            }
         }
 
         errorMessage?.let { Text(it) }
@@ -76,7 +95,7 @@ fun CreateView(
         selectedImage?.let { image ->
             PersistedImage(
                 path = image.localPath,
-                modifier = Modifier.fillMaxWidth().size(280.dp)
+                modifier = Modifier.fillMaxWidth().height(280.dp).clipToBounds()
             )
             OutlinedTextField(
                 value = formState.name,

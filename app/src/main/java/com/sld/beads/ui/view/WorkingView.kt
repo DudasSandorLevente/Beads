@@ -168,9 +168,13 @@ fun WorkingView(
                 ) {
                     Button(
                         onClick = {
-                            viewModel.changeWorkingColumn(imageId, window.currentColumn - 1)
+                            if (!isChangingColumn) {
+                                viewModel.changeWorkingColumn(
+                                    imageId, window.currentColumn - 1
+                                )
+                            }
                         },
-                        enabled = !isChangingColumn && window.currentColumn > 0
+                        enabled = window.currentColumn > 0
                     ) {
                         Text("←")
                     }
@@ -179,10 +183,13 @@ fun WorkingView(
                     )
                     Button(
                         onClick = {
-                            viewModel.changeWorkingColumn(imageId, window.currentColumn + 1)
+                            if (!isChangingColumn) {
+                                viewModel.changeWorkingColumn(
+                                    imageId, window.currentColumn + 1
+                                )
+                            }
                         },
-                        enabled = !isChangingColumn &&
-                            window.currentColumn < window.totalColumns - 1
+                        enabled = window.currentColumn < window.totalColumns - 1
                     ) {
                         Text("→")
                     }
