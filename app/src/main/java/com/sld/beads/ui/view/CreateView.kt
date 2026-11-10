@@ -32,6 +32,10 @@ import com.sld.beads.ConfigurationFormState
 import com.sld.beads.ImagePickerViewModel
 import com.sld.beads.data.ConfigurationField
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 
 @Composable
 fun CreateView(
@@ -44,6 +48,7 @@ fun CreateView(
     val isImporting by viewModel.isImporting.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val formState by viewModel.formState.collectAsState()
+    val focusManager = LocalFocusManager.current
 
     LaunchedEffect(Unit) { viewModel.startCreate() }
     LaunchedEffect(viewModel) { viewModel.savedImageIds.collect(onSaved) }
@@ -95,7 +100,7 @@ fun CreateView(
         selectedImage?.let { image ->
             PersistedImage(
                 path = image.localPath,
-                modifier = Modifier.fillMaxWidth().height(280.dp).clipToBounds()
+                modifier = Modifier.fillMaxWidth().height(180.dp).clipToBounds()
             )
             OutlinedTextField(
                 value = formState.name,
@@ -104,30 +109,50 @@ fun CreateView(
                 singleLine = true,
                 isError = formState.nameError != null,
                 supportingText = formState.nameError?.let { message -> { Text(message) } },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text, imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Next) }
+                )
             )
             Text("Working area (pixels)")
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                IntegerField("X", ConfigurationField.WORKING_AREA_X, formState, viewModel, Modifier.weight(1f))
-                IntegerField("Y", ConfigurationField.WORKING_AREA_Y, formState, viewModel, Modifier.weight(1f))
+                IntegerField(
+                    "X", ConfigurationField.WORKING_AREA_X, formState,
+                    viewModel, Modifier.weight(1f)
+                )
+                IntegerField(
+                    "Y", ConfigurationField.WORKING_AREA_Y, formState,
+                    viewModel, Modifier.weight(1f)
+                )
             }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                IntegerField("Width", ConfigurationField.WORKING_AREA_WIDTH, formState, viewModel, Modifier.weight(1f))
-                IntegerField("Height", ConfigurationField.WORKING_AREA_HEIGHT, formState, viewModel, Modifier.weight(1f))
+                IntegerField("Width", ConfigurationField.WORKING_AREA_WIDTH,
+                    formState, viewModel, Modifier.weight(1f)
+                )
+                IntegerField("Height", ConfigurationField.WORKING_AREA_HEIGHT,
+                    formState, viewModel, Modifier.weight(1f)
+                )
             }
             Text("Bead grid size")
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                IntegerField("Width", ConfigurationField.BEAD_WIDTH, formState, viewModel, Modifier.weight(1f))
-                IntegerField("Height", ConfigurationField.BEAD_HEIGHT, formState, viewModel, Modifier.weight(1f))
+                IntegerField("Width", ConfigurationField.BEAD_WIDTH,
+                    formState, viewModel, Modifier.weight(1f)
+                )
+                IntegerField("Height", ConfigurationField.BEAD_HEIGHT,
+                    formState, viewModel, Modifier.weight(1f)
+                )
             }
             Button(
                 onClick = viewModel::saveConfiguration,
@@ -148,11 +173,20 @@ private fun IntegerField(
     modifier: Modifier = Modifier
 ) {
     val error = state.errors[field]
+    val focusManager = LocalFocusManager.current
     OutlinedTextField(
         value = state.values[field].orEmpty(),
         onValueChange = { viewModel.updateConfigurationField(field, it) },
         label = { Text(label) },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = if (field == ConfigurationField.BEAD_HEIGHT) ImeAction.Done
+            else ImeAction.Next
+        ),
+        keyboardActions = KeyboardActions(
+            onNext = { focusManager.moveFocus(FocusDirection.Next) },
+            onDone = { focusManager.clearFocus() }
+        ),
         singleLine = true,
         isError = error != null,
         supportingText = error?.let { message -> { Text(message) } },
