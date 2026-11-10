@@ -29,27 +29,54 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sld.beads.ImagePickerViewModel
 import com.sld.beads.WorkingColumnState
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.ui.zIndex
 
 internal data class BeadColumnLayout(val squareSize: Dp, val gap: Dp)
 
 internal fun displayedColumnNumber(zeroBasedColumn: Int): Int = zeroBasedColumn + 1
 
+internal fun calculateColorRuns(colors: List<Int>, minimumLength: Int = 5): Map<Int, Int> {
+    require(minimumLength > 0)
+
+    val runs = mutableMapOf<Int, Int>()
+    var start = 0
+
+    while (start < colors.size) {
+        var end = start + 1
+
+        while (end < colors.size && colors[end] == colors[start]) {
+            end++
+        }
+
+        val length = end - start
+
+        if (length >= minimumLength) {
+            runs[start] = length
+        }
+
+        start = end
+    }
+
+    return runs
+}
+
 internal fun calculateVisibleColumnCapacity(
-    availableWidth: Dp,
-    squareSize: Dp,
-    gap: Dp,
-    totalColumns: Int
+    availableWidth: Dp, squareSize: Dp, gap: Dp, totalColumns: Int
 ): Int {
     if (totalColumns <= 0 || squareSize <= 0.dp) return 1
     val capacity = ((availableWidth.value + gap.value) / (squareSize.value + gap.value)).toInt()
     return capacity.coerceIn(1, totalColumns)
 }
 
-internal fun calculateBeadColumnLayout(
-    availableWidth: Dp,
-    availableHeight: Dp,
-    beadCount: Int
-): BeadColumnLayout {
+internal fun calculateBeadColumnLayout(availableWidth: Dp, availableHeight: Dp, beadCount: Int): BeadColumnLayout {
     require(beadCount >= 0)
     if (beadCount == 0) return BeadColumnLayout(0.dp, 0.dp)
 
@@ -65,15 +92,52 @@ internal fun calculateBeadColumnLayout(
 }
 
 @Composable
+private fun RunBubble(count: Int, modifier: Modifier = Modifier) {
+    val bubbleColor = MaterialTheme.colorScheme.surfaceVariant
+    val textColor = MaterialTheme.colorScheme.onSurfaceVariant
+
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Canvas(
+            modifier = Modifier.size(width = 8.dp, height = 12.dp).align(Alignment.CenterStart)
+        ) {
+            val path = Path().apply {
+                moveTo(0f, size.height / 2f)
+                lineTo(size.width, 0f)
+                lineTo(size.width, size.height)
+                close()
+            }
+            drawPath(path, bubbleColor, style = Fill)
+        }
+
+        Box(
+            modifier = Modifier.padding(start = 7.dp).background(
+                color = bubbleColor, shape = RoundedCornerShape(8.dp)
+            ).padding(horizontal = 9.dp, vertical = 3.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = count.toString(),
+                color = textColor,
+                fontSize = 12.sp,
+                maxLines = 1,
+                softWrap = false
+            )
+        }
+    }
+}
+
+@Composable
 fun WorkingView(
-    imageId: String,
-    viewModel: ImagePickerViewModel,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    imageId: String, viewModel: ImagePickerViewModel,
+    onBack: () -> Unit, modifier: Modifier = Modifier
 ) {
     val state by viewModel.workingColumnState.collectAsState()
     val isChangingColumn by viewModel.isChangingWorkingColumn.collectAsState()
     var showNeighbors by rememberSaveable { mutableStateOf(false) }
+    var showRuns by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(imageId) { viewModel.loadWorkingColumn(imageId) }
 
     Column(
@@ -86,12 +150,23 @@ fun WorkingView(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Button(onClick = onBack) { Text("Back") }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
-                    checked = showNeighbors,
-                    onCheckedChange = { showNeighbors = it }
-                )
-                Text("Neighbors")
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = showNeighbors,
+                        onCheckedChange = { showNeighbors = it }
+                    )
+                    Text("Neighbors")
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = showRuns,
+                        onCheckedChange = { showRuns = it }
+                    )
+                    Text("Runs")
+                }
             }
         }
 
@@ -144,18 +219,39 @@ fun WorkingView(
                     ) {
                         displayedColumns.forEach { beadColumn ->
                             Column(
-                                modifier = Modifier.alpha(
-                                    if (beadColumn.column == window.currentColumn) 1f else 0.4f
-                                ),
+                                modifier = Modifier
+                                    .zIndex(
+                                        if (beadColumn.column == window.currentColumn) 1f else 0f
+                                    )
+                                    .alpha(
+                                        if (beadColumn.column == window.currentColumn) 1f else 0.4f
+                                    ),
                                 verticalArrangement = Arrangement.spacedBy(layout.gap),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                beadColumn.colors.forEach { beadColor ->
-                                    Box(
-                                        modifier = Modifier
-                                            .size(layout.squareSize)
-                                            .background(Color(beadColor.argb))
-                                    )
+                                val runs = if (
+                                    showRuns && beadColumn.column == window.currentColumn
+                                ) {
+                                    calculateColorRuns(beadColumn.colors.map { it.argb })
+                                } else {
+                                    emptyMap()
+                                }
+                                beadColumn.colors.forEachIndexed { index, beadColor ->
+                                    Box(modifier = Modifier.size(layout.squareSize)) {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize().background(
+                                                Color(beadColor.argb)
+                                            )
+                                        )
+                                        runs[index]?.let { count ->
+                                            RunBubble(
+                                                count = count,
+                                                modifier = Modifier.align(Alignment.TopEnd)
+                                                    .offset(x = 12.dp, y = (-8).dp)
+                                                    .wrapContentSize(unbounded = true)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
