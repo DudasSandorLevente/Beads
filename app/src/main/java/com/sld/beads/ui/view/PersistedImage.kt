@@ -1,6 +1,5 @@
 package com.sld.beads.ui.view
 
-import android.net.Uri
 import android.graphics.BitmapFactory
 import android.graphics.BitmapRegionDecoder
 import android.graphics.Rect
@@ -8,52 +7,60 @@ import android.widget.ImageView
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
-import java.io.File
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.compose.ui.layout.onSizeChanged
+import kotlinx.coroutines.CancellationException
 
-internal data class ImageCrop(
-    val x: Int,
-    val y: Int,
-    val width: Int,
-    val height: Int
-)
-
-private data class PersistedImageKey(
-    val path: String,
-    val crop: ImageCrop?
-)
+internal data class ImageCrop(val x: Int, val y: Int, val width: Int, val height: Int)
 
 @Composable
 internal fun PersistedImage(
-    path: String,
-    modifier: Modifier = Modifier,
-    fitWidth: Boolean = false,
-    crop: ImageCrop? = null
+    path: String, modifier: Modifier = Modifier, fitWidth: Boolean = false, crop: ImageCrop? = null
 ) {
-    val uri = Uri.fromFile(File(path))
+
+    var previewWidthPx by remember {
+        mutableIntStateOf(0)
+    }
+    var croppedBitmap by remember(path, crop) {
+        mutableStateOf<android.graphics.Bitmap?>(null)
+    }
+    LaunchedEffect(path, crop, previewWidthPx) {
+        croppedBitmap = null
+        if (previewWidthPx <= 0) return@LaunchedEffect
+        croppedBitmap = withContext(Dispatchers.IO) {
+            if (crop != null) decodeCroppedPreview(path, crop, previewWidthPx)
+            else decodeFullPreview(path, previewWidthPx)
+        }
+    }
+
     AndroidView(
-        factory = { context ->
-            ImageView(context)
-        },
+        factory = { context -> ImageView(context) },
         update = { imageView ->
-            imageView.adjustViewBounds = fitWidth || crop != null
+
+            //imageView.adjustViewBounds = fitWidth || crop != null
+            imageView.adjustViewBounds = false
+
+
             imageView.scaleType = if (fitWidth || crop != null) {
                 ImageView.ScaleType.FIT_CENTER
             } else {
                 ImageView.ScaleType.CENTER_CROP
             }
+            imageView.setImageBitmap(croppedBitmap)
 
-            val key = PersistedImageKey(path, crop)
-            if (imageView.tag != key) {
-                imageView.tag = key
-                if (crop == null) {
-                    imageView.setImageURI(uri)
-                } else {
-                    imageView.setImageBitmap(decodeCroppedPreview(path, crop, imageView.width))
-                }
-            }
         },
-        modifier = modifier
+        modifier = modifier.onSizeChanged { size ->
+            previewWidthPx = size.width
+        }
     )
+
 }
 
 private fun decodeCroppedPreview(path: String, crop: ImageCrop, measuredWidth: Int) =
@@ -76,4 +83,26 @@ private fun decodeCroppedPreview(path: String, crop: ImageCrop, measuredWidth: I
         } finally {
             decoder.recycle()
         }
-    }.getOrNull()
+    }.getOrElse { exception ->
+        if (exception is CancellationException) throw exception
+        null
+    }
+
+private fun decodeFullPreview(
+    path: String, targetWidth: Int = 1080
+): android.graphics.Bitmap? = runCatching {
+
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    var sampleSize = 1
+    BitmapFactory.decodeFile(path, bounds)
+    require(bounds.outWidth > 0 && bounds.outHeight > 0)
+    while (bounds.outWidth / (sampleSize * 2L) >= targetWidth) { sampleSize *= 2 }
+
+    BitmapFactory.decodeFile(
+        path, BitmapFactory.Options().apply { inSampleSize = sampleSize }
+    )
+
+}.getOrElse { exception ->
+    if (exception is CancellationException) throw exception
+    null
+}

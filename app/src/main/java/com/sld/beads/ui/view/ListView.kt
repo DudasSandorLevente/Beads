@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sld.beads.ImagePickerViewModel
 import com.sld.beads.data.ImageRecord
+import androidx.compose.foundation.layout.aspectRatio
 
 @Composable
 fun ListView(
@@ -165,11 +167,17 @@ private fun ImageListItem(image: ImageRecord, onClick: () -> Unit) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+        val crop = image.workingAreaCrop()
+
         PersistedImage(
             path = image.localPath,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().aspectRatio(
+                if (crop != null && crop.width > 0 && crop.height > 0)
+                    crop.width.toFloat() / crop.height
+                else 1f
+            ),
             fitWidth = true,
-            crop = image.workingAreaCrop()
+            crop = crop
         )
         Text(
             text = formatImageMetadata(image),

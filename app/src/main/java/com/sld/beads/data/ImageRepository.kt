@@ -9,6 +9,9 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 import java.util.UUID
+import android.graphics.BitmapRegionDecoder
+import android.graphics.Rect
+import androidx.core.graphics.get
 
 class ImageRepository(
     private val context: Context,
@@ -193,18 +196,49 @@ class ImageRepository(
                     height = record.beadHeight ?: throw IllegalStateException("Bead grid is not configured")
                 )
 
-                bitmap = BitmapFactory.decodeFile(
-                    record.localPath,
-                    BitmapFactory.Options().apply {
-                        inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
-                    }
-                ) ?: throw IOException("Could not decode the saved image")
+                val bounds = BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
+                }
+                BitmapFactory.decodeFile(record.localPath, bounds)
 
-                if (workingArea.x < 0 || workingArea.y < 0 ||
-                    workingArea.x.toLong() + workingArea.width > bitmap.width ||
-                    workingArea.y.toLong() + workingArea.height > bitmap.height
+                if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                    throw IOException("Could not read the saved image dimensions")
+                }
+
+                if (
+                    workingArea.width <= 0 || workingArea.height <= 0 ||
+                    workingArea.x < 0 || workingArea.y < 0 ||
+                    workingArea.x.toLong() + workingArea.width > bounds.outWidth ||
+                    workingArea.y.toLong() + workingArea.height > bounds.outHeight
                 ) {
                     throw IllegalStateException("Working area is outside the saved image")
+                }
+
+                val xRange = calculateVisibleSampleXRange(
+                    workingArea = workingArea,
+                    beadGridSize = beadGridSize,
+                    currentColumn = record.currentColumn,
+                    capacity = visibleColumnCapacity
+                )
+
+                val region = Rect(
+                    xRange.first,
+                    workingArea.y,
+                    xRange.last + 1,
+                    workingArea.y + workingArea.height
+                )
+
+                val decoder = BitmapRegionDecoder.newInstance(record.localPath, false)
+                try {
+                    bitmap = decoder.decodeRegion(
+                        region,
+                        BitmapFactory.Options().apply {
+                            inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
+                            inSampleSize = 1
+                        }
+                    ) ?: throw IOException("Could not decode the working image region")
+                } finally {
+                    decoder.recycle()
                 }
 
                 Result.success(
@@ -213,7 +247,7 @@ class ImageRepository(
                         beadGridSize = beadGridSize,
                         currentColumn = record.currentColumn,
                         capacity = visibleColumnCapacity,
-                        pixelAt = bitmap::getPixel
+                        pixelAt =  { x, y -> bitmap[x - region.left, y - region.top] }
                     )
                 )
             } catch (error: CancellationException) {

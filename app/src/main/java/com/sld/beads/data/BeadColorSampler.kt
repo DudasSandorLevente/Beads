@@ -104,3 +104,28 @@ fun sampleBeadColumnWindow(
         }
     )
 }
+
+fun calculateVisibleSampleXRange(
+    workingArea: WorkingArea,
+    beadGridSize: BeadGridSize,
+    currentColumn: Int,
+    capacity: Int
+): IntRange {
+    require(workingArea.width > 0)
+    require(beadGridSize.width > 0)
+
+    val columns = calculateVisibleColumnRange(
+        currentColumn = currentColumn,
+        totalColumns = beadGridSize.width,
+        capacity = capacity
+    )
+
+    val cellWidth = workingArea.width.toDouble() / beadGridSize.width
+    val lastX = workingArea.x + workingArea.width - 1
+
+    fun centerX(column: Int): Int =
+        (workingArea.x + floor((column + 0.5) * cellWidth).toInt())
+            .coerceIn(workingArea.x, lastX)
+
+    return centerX(columns.first)..centerX(columns.last)
+}

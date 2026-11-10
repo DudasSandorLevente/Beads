@@ -93,4 +93,41 @@ class BeadColorSamplerTest {
         assertEquals(listOf(4, 5, 6), window.columns.map(BeadColumn::column))
         assertEquals(listOf(4505, 5505, 6505), window.columns.map { it.colors.first().argb })
     }
+
+    @Test
+    fun visibleSampleXRangeContainsAllSampledColumns() {
+        val workingArea = WorkingArea(
+            x = 100,
+            y = 50,
+            width = 1000,
+            height = 500
+        )
+        val grid = BeadGridSize(width = 100, height = 50)
+        val currentColumn = 40
+        val capacity = 7
+
+        val xRange = calculateVisibleSampleXRange(
+            workingArea = workingArea,
+            beadGridSize = grid,
+            currentColumn = currentColumn,
+            capacity = capacity
+        )
+
+        val visibleColumns = calculateVisibleColumnRange(
+            currentColumn = currentColumn,
+            totalColumns = grid.width,
+            capacity = capacity
+        )
+
+        for (column in visibleColumns) {
+            val sampled = sampleBeadColumn(
+                workingArea = workingArea,
+                beadGridSize = grid,
+                currentColumn = column,
+                pixelAt = { _, _ -> 0 }
+            )
+
+            assertTrue(sampled.colors.all { it.centerX in xRange })
+        }
+    }
 }
